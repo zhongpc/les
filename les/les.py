@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from .module import (
     Atomwise,
-#    Ewald
+    Ewald
 )
 
 __all__ = ['Les']
@@ -25,10 +25,10 @@ class Les(nn.Module):
         add_linear_nn=self.add_linear_nn
     )
 
-        #self.ewald = Ewald(
-        #    sigma=self.sigma,
-        #    dl=self.dl
-        #    )
+        self.ewald = Ewald(
+            sigma=self.sigma,
+            dl=self.dl
+            )
 
     def _parse_arguments(self, les_arguments: Dict[str, Any]):
         """
@@ -61,16 +61,21 @@ class Les(nn.Module):
         """
         # check the input shapes
         assert desc.shape[0] == positions.shape[0]
+        if batch == None:
+            batch = torch.zeros(desc.shape[0], dtype=torch.int64, device=desc.device)
 
         # compute the latent charges
         latent_charges = self.atomwise(desc, batch)
-        E_long = torch.sum(latent_charges, dim=0)
 
         # compute the long-range interactions
-        #E_long = self.ewald(latent_charges, positions, cell)
+        E_lr = self.ewald(q=latent_charges,
+                          r=positions,
+                          cell=cell,
+                          batch=batch,
+                          )
 
         output = {
-            'E_lr': E_long,
+            'E_lr': E_lr,
             'latent_charges': latent_charges,
             'BEC': None,
             }
