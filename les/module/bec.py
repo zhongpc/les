@@ -50,7 +50,7 @@ class BEC(nn.Module):
             if cell is None or torch.linalg.det(box_now) < 1e-6:
                 # the box is not periodic, we use the direct sum
                 polarization = torch.sum(q_now * r_now, dim=0)
-                phases = torch.ones_like(r_now, dtype=torch.complex64)
+                phase = torch.ones_like(r_now, dtype=torch.complex64)
             else:
                 polarization, phase = self.compute_pol_pbc(r_now, q_now, box_now)
             if output_index is not None:
