@@ -4,7 +4,8 @@ from typing import Dict, Any
 
 from .module import (
     Atomwise,
-    Ewald
+    Ewald,
+    BEC
 )
 
 __all__ = ['Les']
@@ -30,6 +31,11 @@ class Les(nn.Module):
             dl=self.dl
             )
 
+        self.bec = BEC(
+             remove_mean=self.remove_mean,
+             normalization_factor=self.normalization_factor,
+             )
+
     def _parse_arguments(self, les_arguments: Dict[str, Any]):
         """
         Parse arguments for LES model
@@ -41,12 +47,16 @@ class Les(nn.Module):
         self.sigma = les_arguments.get('sigma', 1.0)
         self.dl = les_arguments.get('dl', 2.0)
 
+        self.remove_mean = les_arguments.get('remove_mean', True)
+        self.normalization_factor = les_arguments.get('normalization_factor', 1./9.48933)
 
     def forward(self, 
                desc: torch.Tensor, # [n_atoms, n_features]
                positions: torch.Tensor, # [n_atoms, 3]
                cell: torch.Tensor, # [batch_size, 3, 3]
                batch: torch.Tensor = None,
+               compute_bec: bool = False,
+               bec_output_index: int = None, # option to compute BEC components along only one direction
                ) -> torch.Tensor:
         """
         arguments:
@@ -74,9 +84,20 @@ class Les(nn.Module):
                           batch=batch,
                           )
 
+        # compute the BEC
+        if compute_bec:
+            bec = self.bec(q=latent_charges,
+                           r=positions,
+                           cell=cell,
+                           batch=batch,
+                           output_index=bec_output_index,
+		           )
+        else:
+            bec = None
+
         output = {
             'E_lr': E_lr,
             'latent_charges': latent_charges,
-            'BEC': None,
+            'BEC': bec,
             }
         return output 
