@@ -42,8 +42,6 @@ box_full = torch.tensor([
 # Replicate the box 2x2x2 times
 replicated_r, replicated_q, new_box = replicate_box(r, q, box, nx=2, ny=2, nz=2)
 
-# the value should be 2.1017
-
 ew_1 = ep.compute_potential_triclinic(torch.tensor(r), torch.tensor(q).unsqueeze(1), torch.tensor(box_full))
 print(ew_1)
 

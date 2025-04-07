@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 from .module import (
     Atomwise,
@@ -12,18 +12,24 @@ __all__ = ['Les']
 
 class Les(nn.Module):
 
-    def __init__(self, les_arguments: Dict[str, Any]):
+    def __init__(self, les_arguments: Union[Dict[str, Any], str] = {}):
         """
         LES model for long-range interations
         """
         super().__init__()
+
+        if isinstance(les_arguments, str):
+            import yaml
+            with open(les_arguments, 'r') as file:
+                les_arguments = yaml.safe_load(file)
 
         self._parse_arguments(les_arguments)
 
         self.atomwise = Atomwise(
         n_layers=self.n_layers,
         n_hidden=self.n_hidden,
-        add_linear_nn=self.add_linear_nn
+        add_linear_nn=self.add_linear_nn,
+        output_scaling_factor=self.output_scaling_factor, 
     )
 
         self.ewald = Ewald(
@@ -33,7 +39,7 @@ class Les(nn.Module):
 
         self.bec = BEC(
              remove_mean=self.remove_mean,
-             normalization_factor=self.normalization_factor,
+             epsilon_factor=self.epsilon_factor,
              )
 
     def _parse_arguments(self, les_arguments: Dict[str, Any]):
@@ -43,18 +49,20 @@ class Les(nn.Module):
         self.n_layers = les_arguments.get('n_layers', 3)
         self.n_hidden = les_arguments.get('n_hidden', [32, 16])
         self.add_linear_nn = les_arguments.get('add_linear_nn', True)
+        self.output_scaling_factor = les_arguments.get('output_scaling_factor', 0.1)
 
         self.sigma = les_arguments.get('sigma', 1.0)
         self.dl = les_arguments.get('dl', 2.0)
 
         self.remove_mean = les_arguments.get('remove_mean', True)
-        self.normalization_factor = les_arguments.get('normalization_factor', 1./9.48933)
+        self.epsilon_factor = les_arguments.get('epsilon_factor', 1.)
 
     def forward(self, 
                desc: torch.Tensor, # [n_atoms, n_features]
                positions: torch.Tensor, # [n_atoms, 3]
                cell: torch.Tensor, # [batch_size, 3, 3]
                batch: torch.Tensor = None,
+               compute_energy: bool = True,
                compute_bec: bool = False,
                bec_output_index: int = None, # option to compute BEC components along only one direction
                ) -> torch.Tensor:
@@ -78,11 +86,12 @@ class Les(nn.Module):
         latent_charges = self.atomwise(desc, batch)
 
         # compute the long-range interactions
-        E_lr = self.ewald(q=latent_charges,
-                          r=positions,
-                          cell=cell,
-                          batch=batch,
-                          )
+        if compute_energy:
+            E_lr = self.ewald(q=latent_charges,
+                              r=positions,
+                              cell=cell,
+                              batch=batch,
+                              )
 
         # compute the BEC
         if compute_bec:

@@ -17,7 +17,7 @@ box_full = torch.tensor([
     [0,10.0, 0], 
     [0,0,10.0]])  # Box dimensions
 
-bec = BEC(remove_mean=False, normalization_factor=1)
+bec = BEC(remove_mean=False)
 
 test = bec(q=q,
     r=r,

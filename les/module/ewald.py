@@ -21,10 +21,7 @@ class Ewald(nn.Module):
         self.remove_self_interaction = remove_self_interaction
         # 1/2\epsilon_0, where \epsilon_0 is the vacuum permittivity
         # \epsilon_0 = 5.55263*10^{-3} e^2 eV^{-1} A^{-1}
-        #self.norm_factor = 90.0474
-        self.norm_factor = 1.0 
-        # when using a norm_factor = 1, all "charges" are scaled by sqrt(90.0474)
-        # the external field is then scaled by sqrt(90.0474) = 9.48933
+        self.norm_factor = 90.0474
         self.k_sq_max = (self.twopi / self.dl) ** 2
 
     def forward(self,
@@ -32,7 +29,7 @@ class Ewald(nn.Module):
                 r: torch.Tensor, # [n_atoms, 3]
                 cell: torch.Tensor, # [batch_size, 3, 3]
                 batch: torch.Tensor = None,
-                ):
+                ) -> torch.Tensor:
         
         if q.dim() == 1:
             q = q.unsqueeze(1)
@@ -101,7 +98,6 @@ class Ewald(nn.Module):
     # Triclinic box(could be orthorhombic)
     def compute_potential_triclinic(self, r_raw, q, cell_now):
         device = r_raw.device
-        print(r_raw.type(), q.type(), cell_now.type())
 
         cell_inv = torch.linalg.inv(cell_now)
         G = 2 * torch.pi * cell_inv.T  # Reciprocal lattice vectors [3,3], G = 2π(M^{-1}).T
@@ -153,3 +149,6 @@ class Ewald(nn.Module):
             pot -= torch.sum(q**2) / (self.sigma * (2 * torch.pi)**1.5)
 
         return pot.unsqueeze(0) * self.norm_factor
+
+    def __repr__(self):
+        return f"Ewald(dl={self.dl}, sigma={self.sigma}, remove_self_interaction={self.remove_self_interaction})"

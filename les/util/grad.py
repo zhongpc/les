@@ -2,7 +2,7 @@ from typing import Dict
 import torch
 from torch import nn
 
-def grad(x: torch.Tensor, y: torch.Tensor, training: bool = True) -> torch.Tensor:
+def grad(y: torch.Tensor, x: torch.Tensor, training: bool = True) -> torch.Tensor:
     """
     a wrapper for the gradient calculation
     alow multiple dimensional and/or complex y

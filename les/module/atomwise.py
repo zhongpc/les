@@ -22,6 +22,7 @@ class Atomwise(nn.Module):
         bias: bool = True,
         activation: Callable = F.silu,
         add_linear_nn: bool = False,
+        output_scaling_factor: float = 1.0,
     ):
         """
         Args:
@@ -44,6 +45,7 @@ class Atomwise(nn.Module):
         self.activation = activation
         self.add_linear_nn = add_linear_nn
         self.bias = bias
+        self.output_scaling_factor = output_scaling_factor
 
         if n_in is not None:
             self.outnet = build_mlp(
@@ -100,4 +102,7 @@ class Atomwise(nn.Module):
         if self.add_linear_nn:
             y += self.linear_nn(desc)
 
-        return y
+        return y * self.output_scaling_factor
+
+    def __repr__(self):
+        return f"Atomwise(n_in={self.n_in}, n_out={self.n_out}, n_hidden={self.n_hidden}, n_layers={self.n_layers}, bias={self.bias}, activation={self.activation.__name__})"

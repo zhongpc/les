@@ -9,11 +9,12 @@ __all__ = ['BEC']
 class BEC(nn.Module):
     def __init__(self,
                  remove_mean: bool = True,
-                 normalization_factor: float = 1./9.48933,
+                 epsilon_factor: float = 1., # \epsilon_infty
                  ):
         super().__init__()
         self.remove_mean = remove_mean
-        self.normalization_factor = normalization_factor
+        self.epsilon_factor = epsilon_factor
+        self.normalization_factor = epsilon_factor ** 0.5
 
     def forward(self,
                 q: torch.Tensor,  # [n_atoms, n_q]
@@ -76,3 +77,6 @@ class BEC(nn.Module):
         polarization = torch.matmul(box_now.to(S.dtype), 
                                     S.unsqueeze(1)) / (1j * 2.* torch.pi)
         return polarization.reshape(-1), phase
+
+    def __repr__(self):
+        return f'BEC(remove_mean={self.remove_mean}, epsilon_factor={self.epsilon_factor})'
