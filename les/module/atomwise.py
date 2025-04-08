@@ -58,7 +58,7 @@ class Atomwise(nn.Module):
         else:
             assert self.n_in == desc.shape[1]
 
-        if self.outnet == None:
+        if self.outnet is None:
             self.outnet = build_mlp(
                 n_in=self.n_in,
                 n_out=self.n_out,
