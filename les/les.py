@@ -22,6 +22,8 @@ class Les(nn.Module):
             import yaml
             with open(les_arguments, 'r') as file:
                 les_arguments = yaml.safe_load(file)
+                if les_arguments is None:
+                    les_arguments = {}
 
         self._parse_arguments(les_arguments)
 
