@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 setup(
     name="les",
     version="0.1.0",
-    packages=find_packages(where="les"),
-    package_dir={"": "les"},
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     install_requires=[
     ],
     entry_points={
