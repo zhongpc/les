@@ -64,16 +64,17 @@ class Ewald(nn.Module):
 
     def compute_potential_realspace(self, r_raw, q):
         # Compute pairwise distances (norm of vector differences)
+        # Add epsilon for safe Hessian compute
+        epsilon = 1e-6
         r_ij = r_raw.unsqueeze(0) - r_raw.unsqueeze(1)
+        torch.diagonal(r_ij).add_(epsilon)
         r_ij_norm = torch.norm(r_ij, dim=-1)
  
         # Error function scaling for long-range interactions
         convergence_func_ij = torch.special.erf(r_ij_norm / self.sigma / (2.0 ** 0.5))
    
-        # Compute inverse distance safely
-        # [n_node, n_node]
-        epsilon = 1e-6
-        r_p_ij = 1.0 / (r_ij_norm + epsilon)
+        # Compute inverse distance
+        r_p_ij = 1.0 / (r_ij_norm)
 
         if q.dim() == 1:
             # [n_node, n_q]
