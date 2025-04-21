@@ -83,10 +83,9 @@ class Ewald(nn.Module):
         # Compute potential energy
         n_node, n_q = q.shape
         # [1, n_node, n_q] * [n_node, 1, n_q] * [n_node, n_node, 1] * [n_node, n_node, 1]
-        # pot = torch.sum(q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)).view(-1) / self.twopi / 2.0
-
-        #Exclude diagonal terms
         pot = q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)
+
+        #Exclude diagonal terms from energy
         mask = ~torch.eye(pot.shape[0], dtype=bool).unsqueeze(-1)
         mask = torch.vstack([mask.transpose(0,-1)]*pot.shape[-1]).transpose(0,-1)
         pot = pot[mask].sum().view(-1) / self.twopi / 2.0
