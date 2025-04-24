@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Dict
+from typing import Dict, Optional
 
 from ..util import grad
 
@@ -20,14 +20,12 @@ class BEC(nn.Module):
                 q: torch.Tensor,  # [n_atoms, n_q]
                 r: torch.Tensor, # [n_atoms, 3]
                 cell: torch.Tensor, # [batch_size, 3, 3]
-                batch: torch.Tensor = None,
-                output_index: int = None, # 0, 1, 2 to select only one component
+                batch: Optional[torch.Tensor] = None,
+                output_index: Optional[int] = None, # 0, 1, 2 to select only one component
                 ) -> torch.Tensor:
 
         if q.dim() == 1:
             q = q.unsqueeze(1)
-        if self.remove_mean:
-            q = q - torch.mean(q, dim=0, keepdim=True)
 
         # Check the input dimension
         n, d = r.shape
@@ -44,6 +42,9 @@ class BEC(nn.Module):
         for i in unique_batches:
             mask = batch == i  # Create a mask for the i-th configuration
             r_now, q_now = r[mask], q[mask]
+            if self.remove_mean:
+                q_now = q_now - torch.mean(q_now, dim=0, keepdim=True)
+    
             if cell is not None:
                 box_now = cell[i]  # Get the box for the i-th configuration
 
