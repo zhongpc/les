@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from itertools import product
-from typing import Dict
+from typing import Dict, Optional
 import numpy as np
 
 __all__ = ['Ewald']
@@ -28,7 +28,7 @@ class Ewald(nn.Module):
                 q: torch.Tensor,  # [n_atoms, n_q]
                 r: torch.Tensor, # [n_atoms, 3]
                 cell: torch.Tensor, # [batch_size, 3, 3]
-                batch: torch.Tensor = None,
+                batch: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
         
         if q.dim() == 1:
@@ -60,7 +60,7 @@ class Ewald(nn.Module):
                 pot = self.compute_potential_triclinic(r_raw_now, q_now, box_now)
             results.append(pot)
 
-        return torch.stack(results, dim=0).sum(axis=1)
+        return torch.stack(results, dim=0).sum(dim=1)
 
     def compute_potential_realspace(self, r_raw, q):
         # Compute pairwise distances (norm of vector differences)
@@ -136,12 +136,19 @@ class Ewald(nn.Module):
         exp_ikr = torch.exp(1j * k_dot_r)
         S_k = torch.sum(q * exp_ikr, dim=0)  # [M]
 
+         #for torchscript compatibility, to avoid dtype mismatch, only use real part
+        cos_k_dot_r = torch.cos(k_dot_r)
+        sin_k_dot_r = torch.sin(k_dot_r)
+        S_k_real = torch.sum(q * cos_k_dot_r, dim=0)  # [M]
+        S_k_imag = torch.sum(q * sin_k_dot_r, dim=0)  # [M]
+        S_k_sq = S_k_real**2 + S_k_imag**2  # [M]
+
         # Compute kfac,  exp(-σ^2/2 k^2) / k^2 for exponent = 1
         kfac = torch.exp(-self.sigma_sq_half * k_sq) / k_sq
         
         # Compute potential, (2π/volume)* sum(factors * kfac * |S(k)|^2)
         volume = torch.det(cell_now)
-        pot = (factors * kfac * torch.abs(S_k)**2).sum() / volume
+        pot = (factors * kfac * S_k_sq).sum() / volume
         
 
         # Remove self-interaction if applicable
