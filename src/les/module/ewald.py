@@ -64,16 +64,17 @@ class Ewald(nn.Module):
 
     def compute_potential_realspace(self, r_raw, q):
         # Compute pairwise distances (norm of vector differences)
+        # Add epsilon for safe Hessian compute
+        epsilon = 1e-6
         r_ij = r_raw.unsqueeze(0) - r_raw.unsqueeze(1)
+        torch.diagonal(r_ij).add_(epsilon)
         r_ij_norm = torch.norm(r_ij, dim=-1)
  
         # Error function scaling for long-range interactions
         convergence_func_ij = torch.special.erf(r_ij_norm / self.sigma / (2.0 ** 0.5))
    
-        # Compute inverse distance safely
-        # [n_node, n_node]
-        epsilon = 1e-6
-        r_p_ij = 1.0 / (r_ij_norm + epsilon)
+        # Compute inverse distance
+        r_p_ij = 1.0 / (r_ij_norm)
 
         if q.dim() == 1:
             # [n_node, n_q]
@@ -81,20 +82,20 @@ class Ewald(nn.Module):
     
         # Compute potential energy
         n_node, n_q = q.shape
-        # Use broadcasting to set diagonal elements to 0
-        #mask = torch.ones(n_node, n_node, n_q, dtype=torch.int64, device=q.device)
-        #diag_indices = torch.arange(n_node)
-        #mask[diag_indices, diag_indices, :] = 0
         # [1, n_node, n_q] * [n_node, 1, n_q] * [n_node, n_node, 1] * [n_node, n_node, 1]
-        pot = torch.sum(q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)).view(-1) / self.twopi / 2.0
-    
+        pot = q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)
+
+        #Exclude diagonal terms from energy
+        mask = ~torch.eye(pot.shape[0], dtype=bool).unsqueeze(-1)
+        mask = torch.vstack([mask.transpose(0,-1)]*pot.shape[-1]).transpose(0,-1)
+        pot = pot[mask].sum().view(-1) / self.twopi / 2.0
+
         # because this realspace sum already removed self-interaction, we need to add it back if needed
         if self.remove_self_interaction == False:
             pot += torch.sum(q ** 2) / (self.sigma * self.twopi**(3./2.))
     
         return pot * self.norm_factor
  
-
     # Triclinic box(could be orthorhombic)
     def compute_potential_triclinic(self, r_raw, q, cell_now):
         device = r_raw.device
