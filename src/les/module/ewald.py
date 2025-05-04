@@ -10,7 +10,7 @@ class Ewald(nn.Module):
     def __init__(self,
                  dl=2.0,  # grid resolution
                  sigma=1.0,  # width of the Gaussian on each atom
-                 remove_self_interaction=False,
+                 remove_self_interaction=True,
                  ):
         super().__init__()
         self.dl = dl
