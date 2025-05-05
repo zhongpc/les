@@ -1,4 +1,4 @@
-from typing import Callable, Union, Optional, Sequence, List
+from typing import Callable, Union, Optional, Sequence
 
 import torch
 from torch import nn
@@ -15,11 +15,11 @@ from typing import Union, Callable
 def build_mlp(
     n_in: int,
     n_out: int,
-    n_hidden: Optional[List[int]] = None,
+    n_hidden: Optional[Union[int, Sequence[int]]] = None,
     n_layers: int = 2,
-    activation = F.silu,
+    activation: Callable = F.silu,
     bias: bool = True,
-):
+) -> nn.Module:
     """
     Build multiple layer fully connected perceptron neural network.
 
@@ -38,19 +38,19 @@ def build_mlp(
     """
     # get list of number of nodes in input, hidden & output layers
     if n_hidden is None:
-        n_neurons = [0] * (n_layers + 1)
-        n_neurons[0] = int(n_in)
-        current = int(n_in)
-        for i in range(1, n_layers):
-            current = max(int(n_out), current // 2)
-            n_neurons[i] = current
-        n_neurons[n_layers] = int(n_out)
+        c_neurons = n_in
+        n_neurons = []
+        for i in range(n_layers):
+            n_neurons.append(c_neurons)
+            c_neurons = max(n_out, c_neurons // 2)
+        n_neurons.append(n_out)
     else:
         # get list of number of nodes hidden layers
-        if isinstance(n_hidden, int):
-            n_neurons = [int(n_in)] + [int(n_hidden)] * (n_layers - 1) + [int(n_out)]
+        if type(n_hidden) is int:
+            n_hidden = [n_hidden] * (n_layers - 1)
         else:
-            n_neurons = [int(n_in)] + [int(h) for h in n_hidden] + [int(n_out)]
+            n_hidden = list(n_hidden)
+        n_neurons = [n_in] + n_hidden + [n_out]
 
     # assign a Dense layer (with activation function) to each hidden layer
     layers = [
