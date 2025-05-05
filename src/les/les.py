@@ -26,13 +26,17 @@ class Les(nn.Module):
                     les_arguments = {}
 
         self._parse_arguments(les_arguments)
-
-        self.atomwise = Atomwise(
-        n_layers=self.n_layers,
-        n_hidden=self.n_hidden,
-        add_linear_nn=self.add_linear_nn,
-        output_scaling_factor=self.output_scaling_factor, 
-    )
+ 
+        self.atomwise: nn.Module = (
+            Atomwise(
+                n_layers=self.n_layers,
+                n_hidden=self.n_hidden,
+                add_linear_nn=self.add_linear_nn,
+                output_scaling_factor=self.output_scaling_factor, 
+            )
+            if self.use_atomwise
+            else _DummyAtomwise()
+        )
 
         self.ewald = Ewald(
             sigma=self.sigma,
@@ -58,6 +62,7 @@ class Les(nn.Module):
 
         self.remove_mean = les_arguments.get('remove_mean', True)
         self.epsilon_factor = les_arguments.get('epsilon_factor', 1.)
+        self.use_atomwise = les_arguments.get('use_atomwise', True)
 
     def forward(self, 
                positions: torch.Tensor, # [n_atoms, 3]
@@ -90,7 +95,9 @@ class Les(nn.Module):
         if latent_charges is not None:
             # check the shape of latent charges
             assert latent_charges.shape[0] == positions.shape[0]
-        elif desc is not None:
+        elif desc is not None and latent_charges is None:
+            if not self.use_atomwise:
+                raise ValueError("desc must be provided and use_atomwise must be True if latent_charges is not provided")
             # compute the latent charges
             assert desc.shape[0] == positions.shape[0]
             latent_charges = self.atomwise(desc, batch)
@@ -124,3 +131,7 @@ class Les(nn.Module):
             'BEC': bec,
             }
         return output 
+
+class _DummyAtomwise(nn.Module):
+    def forward(self, desc: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
+        raise ValueError("set use_atomwise to True to use Atomwise module")
