@@ -22,7 +22,7 @@ result = les(desc=r,
     cell=box_full.unsqueeze(0),
     batch=None,
     compute_bec=False,)
-torch.save(les, "./saved_modules/les.pt")
+# torch.save(les, "./saved_modules/les.pt")
 
 # scripting save all modules
 for name, module in les.named_modules():
@@ -64,3 +64,12 @@ else:
     for k in result.keys():
         if result[k] is not None and torch.allclose(result[k], script_result[k]):
             print(f"Key: {k} \n Torchscript result is identical to original result.")
+
+
+les_no_atomwise = Les(les_arguments={'use_atomwise': False})
+torch.jit.script(les_no_atomwise)
+result = les(latent_charges=q,
+                positions=r,
+                cell=box_full.unsqueeze(0),
+                batch=None,
+                compute_bec=False,)
