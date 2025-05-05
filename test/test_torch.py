@@ -42,7 +42,7 @@ try:
     with tempfile.NamedTemporaryFile() as tmp:
         torch.jit.save(scripted_model, tmp.name)
     print("Model scripted and saved successfully.")
-except:
+except Exception as e:
     logging.error(f"Error scripting or saving the model: {e}")
     logging.error(traceback.format_exc())
 

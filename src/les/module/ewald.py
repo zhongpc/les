@@ -86,7 +86,7 @@ class Ewald(nn.Module):
         pot = q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)
 
         #Exclude diagonal terms from energy
-        mask = ~torch.eye(pot.shape[0], dtype=bool).unsqueeze(-1)
+        mask = ~torch.eye(pot.shape[0], device=pot.device).to(torch.bool).unsqueeze(-1)
         mask = torch.vstack([mask.transpose(0,-1)]*pot.shape[-1]).transpose(0,-1)
         pot = pot[mask].sum().view(-1) / self.twopi / 2.0
 
