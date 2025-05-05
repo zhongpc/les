@@ -17,13 +17,12 @@ box_full = torch.tensor([
     [0,10.0, 0], 
     [0,0,10.0]])  # Box dimensions
 
-# result = les(desc=r,
-#     positions=r,
-#     cell=box_full.unsqueeze(0),
-#     batch=None,
-#     compute_bec=False,)
-# torch.save(les, "./saved_modules/les.pt")
-
+result = les(desc=r,
+    positions=r,
+    cell=box_full.unsqueeze(0),
+    batch=None,
+    compute_bec=False,)
+torch.save(les, "./saved_modules/les.pt")
 
 # scripting save all modules
 for name, module in les.named_modules():
@@ -36,32 +35,32 @@ for name, module in les.named_modules():
     except Exception as e:
         print(f"Save failed: {name}, Error: {e}")
 
-# #scripting and save the whole model
-# try:
-#     scripted_model = torch.jit.script(les)
-#     with tempfile.NamedTemporaryFile() as tmp:
-#         torch.jit.save(scripted_model, tmp.name)
-#     print("Model scripted and saved successfully.")
-# except Exception as e:
-#     logging.error(f"Error scripting or saving the model: {e}")
-#     logging.error(traceback.format_exc())
+#scripting and save the whole model
+try:
+    scripted_model = torch.jit.script(les)
+    with tempfile.NamedTemporaryFile() as tmp:
+        torch.jit.save(scripted_model, tmp.name)
+    print("Model scripted and saved successfully.")
+except Exception as e:
+    logging.error(f"Error scripting or saving the model: {e}")
+    logging.error(traceback.format_exc())
 
-# #multiple inferences test
-# try:
-#     for i in range(3):
-#         script_result = scripted_model(desc=r,
-#                                         positions=r,
-#                                         cell=box_full.unsqueeze(0),
-#                                         batch=None,
-#                                         compute_bec=False,)  
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-#     logging.error(traceback.format_exc())
+#multiple inferences test
+try:
+    for i in range(3):
+        script_result = scripted_model(desc=r,
+                                        positions=r,
+                                        cell=box_full.unsqueeze(0),
+                                        batch=None,
+                                        compute_bec=False,)  
+except Exception as e:
+    logging.error(f"Error: {e}")
+    logging.error(traceback.format_exc())
 
-# #check the results consistency
-# if result.keys() != script_result.keys():
-#     print("Keys do not match")
-# else:
-#     for k in result.keys():
-#         if result[k] is not None and torch.allclose(result[k], script_result[k]):
-#             print(f"Key: {k} \n Torchscript result is identical to original result.")
+#check the results consistency
+if result.keys() != script_result.keys():
+    print("Keys do not match")
+else:
+    for k in result.keys():
+        if result[k] is not None and torch.allclose(result[k], script_result[k]):
+            print(f"Key: {k} \n Torchscript result is identical to original result.")
