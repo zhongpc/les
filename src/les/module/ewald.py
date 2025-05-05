@@ -10,7 +10,7 @@ class Ewald(nn.Module):
     def __init__(self,
                  dl=2.0,  # grid resolution
                  sigma=1.0,  # width of the Gaussian on each atom
-                 remove_self_interaction=False,
+                 remove_self_interaction=True,
                  ):
         super().__init__()
         self.dl = dl
@@ -49,7 +49,7 @@ class Ewald(nn.Module):
             # Calculate the potential energy for the i-th configuration
             r_raw_now, q_now = r[mask], q[mask]
             if cell is not None:
-                box_now = cell[i]  # Get the box for the i-th configuration
+                box_now = cell[i].detach()  # Get the box for the i-th configuration
             
             # check if the box is periodic or not
             if cell is None or torch.linalg.det(box_now) < 1e-6:
