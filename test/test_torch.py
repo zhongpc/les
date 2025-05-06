@@ -24,7 +24,6 @@ result = les(desc=r,
     compute_bec=False,)
 # torch.save(les, "./saved_modules/les.pt")
 
-
 # scripting save all modules
 for name, module in les.named_modules():
     try:
@@ -42,7 +41,7 @@ try:
     with tempfile.NamedTemporaryFile() as tmp:
         torch.jit.save(scripted_model, tmp.name)
     print("Model scripted and saved successfully.")
-except:
+except Exception as e:
     logging.error(f"Error scripting or saving the model: {e}")
     logging.error(traceback.format_exc())
 
@@ -65,3 +64,12 @@ else:
     for k in result.keys():
         if result[k] is not None and torch.allclose(result[k], script_result[k]):
             print(f"Key: {k} \n Torchscript result is identical to original result.")
+
+
+les_no_atomwise = Les(les_arguments={'use_atomwise': False})
+torch.jit.script(les_no_atomwise)
+result = les(latent_charges=q,
+                positions=r,
+                cell=box_full.unsqueeze(0),
+                batch=None,
+                compute_bec=False,)
