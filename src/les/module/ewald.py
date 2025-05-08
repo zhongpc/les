@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from itertools import product
-from typing import Dict
+from typing import Dict, Optional
 import numpy as np
 
 __all__ = ['Ewald']
@@ -10,8 +10,8 @@ class Ewald(nn.Module):
     def __init__(self,
                  dl=2.0,  # grid resolution
                  sigma=1.0,  # width of the Gaussian on each atom
-                 remove_self_interaction=False,
-                 norm_factor = 90.0474,
+                 remove_self_interaction=True,
+                 norm_factor=90.0474,
                  ):
         super().__init__()
         self.dl = dl
@@ -29,7 +29,7 @@ class Ewald(nn.Module):
                 q: torch.Tensor,  # [n_atoms, n_q]
                 r: torch.Tensor, # [n_atoms, 3]
                 cell: torch.Tensor, # [batch_size, 3, 3]
-                batch: torch.Tensor = None,
+                batch: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
         
         if q.dim() == 1:
@@ -61,20 +61,21 @@ class Ewald(nn.Module):
                 pot = self.compute_potential_triclinic(r_raw_now, q_now, box_now)
             results.append(pot)
 
-        return torch.stack(results, dim=0).sum(axis=1)
+        return torch.stack(results, dim=0).sum(dim=1)
 
     def compute_potential_realspace(self, r_raw, q):
         # Compute pairwise distances (norm of vector differences)
+        # Add epsilon for safe Hessian compute
+        epsilon = 1e-6
         r_ij = r_raw.unsqueeze(0) - r_raw.unsqueeze(1)
+        torch.diagonal(r_ij).add_(epsilon)
         r_ij_norm = torch.norm(r_ij, dim=-1)
  
         # Error function scaling for long-range interactions
         convergence_func_ij = torch.special.erf(r_ij_norm / self.sigma / (2.0 ** 0.5))
    
-        # Compute inverse distance safely
-        # [n_node, n_node]
-        epsilon = 1e-6
-        r_p_ij = 1.0 / (r_ij_norm + epsilon)
+        # Compute inverse distance
+        r_p_ij = 1.0 / (r_ij_norm)
 
         if q.dim() == 1:
             # [n_node, n_q]
@@ -82,20 +83,20 @@ class Ewald(nn.Module):
     
         # Compute potential energy
         n_node, n_q = q.shape
-        # Use broadcasting to set diagonal elements to 0
-        #mask = torch.ones(n_node, n_node, n_q, dtype=torch.int64, device=q.device)
-        #diag_indices = torch.arange(n_node)
-        #mask[diag_indices, diag_indices, :] = 0
         # [1, n_node, n_q] * [n_node, 1, n_q] * [n_node, n_node, 1] * [n_node, n_node, 1]
-        pot = torch.sum(q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)).view(-1) / self.twopi / 2.0
-    
+        pot = q.unsqueeze(0) * q.unsqueeze(1) * r_p_ij.unsqueeze(2) * convergence_func_ij.unsqueeze(2)
+
+        #Exclude diagonal terms from energy
+        mask = ~torch.eye(pot.shape[0], device=pot.device).to(torch.bool).unsqueeze(-1)
+        mask = torch.vstack([mask.transpose(0,-1)]*pot.shape[-1]).transpose(0,-1)
+        pot = pot[mask].sum().view(-1) / self.twopi / 2.0
+
         # because this realspace sum already removed self-interaction, we need to add it back if needed
         if self.remove_self_interaction == False:
             pot += torch.sum(q ** 2) / (self.sigma * self.twopi**(3./2.))
     
         return pot * self.norm_factor
  
-
     # Triclinic box(could be orthorhombic)
     def compute_potential_triclinic(self, r_raw, q, cell_now):
         device = r_raw.device
@@ -137,12 +138,19 @@ class Ewald(nn.Module):
         exp_ikr = torch.exp(1j * k_dot_r)
         S_k = torch.sum(q * exp_ikr, dim=0)  # [M]
 
+         #for torchscript compatibility, to avoid dtype mismatch, only use real part
+        cos_k_dot_r = torch.cos(k_dot_r)
+        sin_k_dot_r = torch.sin(k_dot_r)
+        S_k_real = torch.sum(q * cos_k_dot_r, dim=0)  # [M]
+        S_k_imag = torch.sum(q * sin_k_dot_r, dim=0)  # [M]
+        S_k_sq = S_k_real**2 + S_k_imag**2  # [M]
+
         # Compute kfac,  exp(-σ^2/2 k^2) / k^2 for exponent = 1
         kfac = torch.exp(-self.sigma_sq_half * k_sq) / k_sq
         
         # Compute potential, (2π/volume)* sum(factors * kfac * |S(k)|^2)
         volume = torch.det(cell_now)
-        pot = (factors * kfac * torch.abs(S_k)**2).sum() / volume
+        pot = (factors * kfac * S_k_sq).sum() / volume
         
 
         # Remove self-interaction if applicable

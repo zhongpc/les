@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 
 from .module import (
     Atomwise,
@@ -26,13 +26,17 @@ class Les(nn.Module):
                     les_arguments = {}
 
         self._parse_arguments(les_arguments)
-
-        self.atomwise = Atomwise(
-        n_layers=self.n_layers,
-        n_hidden=self.n_hidden,
-        add_linear_nn=self.add_linear_nn,
-        output_scaling_factor=self.output_scaling_factor, 
-    )
+ 
+        self.atomwise: nn.Module = (
+            Atomwise(
+                n_layers=self.n_layers,
+                n_hidden=self.n_hidden,
+                add_linear_nn=self.add_linear_nn,
+                output_scaling_factor=self.output_scaling_factor, 
+            )
+            if self.use_atomwise
+            else _DummyAtomwise()
+        )
 
         self.ewald = Ewald(
             sigma=self.sigma,
@@ -58,17 +62,18 @@ class Les(nn.Module):
 
         self.remove_mean = les_arguments.get('remove_mean', True)
         self.epsilon_factor = les_arguments.get('epsilon_factor', 1.)
+        self.use_atomwise = les_arguments.get('use_atomwise', True)
 
     def forward(self, 
                positions: torch.Tensor, # [n_atoms, 3]
                cell: torch.Tensor, # [batch_size, 3, 3]
-               desc: torch.Tensor = None, # [n_atoms, n_features]
-               latent_charges: torch.Tensor = None, # [n_atoms, ]
-               batch: torch.Tensor = None,
+               desc: Optional[torch.Tensor]= None, # [n_atoms, n_features]
+               latent_charges: Optional[torch.Tensor] = None, # [n_atoms, ]
+               batch: Optional[torch.Tensor] = None,
                compute_energy: bool = True,
                compute_bec: bool = False,
-               bec_output_index: int = None, # option to compute BEC components along only one direction
-               ) -> torch.Tensor:
+               bec_output_index: Optional[int] = None, # option to compute BEC components along only one direction
+               ) -> Dict[str, Optional[torch.Tensor]]:
         """
         arguments:
         desc: torch.Tensor
@@ -83,17 +88,21 @@ class Les(nn.Module):
             batch of the system. Shape: (n_atoms,)
         """
         # check the input shapes
-        if batch == None:
-            batch = torch.zeros(positions.shape[0], dtype=torch.int64, device=desc.device)
+        if batch is None:
+            batch = torch.zeros(positions.shape[0], dtype=torch.int64, device=positions.device)
 
 
         if latent_charges is not None:
             # check the shape of latent charges
             assert latent_charges.shape[0] == positions.shape[0]
-        else:
+        elif desc is not None and latent_charges is None:
+            if not self.use_atomwise:
+                raise ValueError("desc must be provided and use_atomwise must be True if latent_charges is not provided")
             # compute the latent charges
             assert desc.shape[0] == positions.shape[0]
             latent_charges = self.atomwise(desc, batch)
+        else:
+            raise ValueError("Either desc or latent_charges must be provided")
 
         # compute the long-range interactions
         if compute_energy:
@@ -102,6 +111,8 @@ class Les(nn.Module):
                               cell=cell,
                               batch=batch,
                               )
+        else:
+            E_lr = None
 
         # compute the BEC
         if compute_bec:
@@ -120,3 +131,7 @@ class Les(nn.Module):
             'BEC': bec,
             }
         return output 
+
+class _DummyAtomwise(nn.Module):
+    def forward(self, desc: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
+        raise ValueError("set use_atomwise to True to use Atomwise module")

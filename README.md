@@ -41,6 +41,14 @@ This project is licensed under the CC BY-NC 4.0 License.
   year={2024}
 }
 
+@article{zhong2025machine,
+  title={Machine learning interatomic potential can infer electrical response},
+  author={Zhong, Peichen and Kim, Dongjin and King, Daniel S and Cheng, Bingqing},
+  journal={arXiv preprint arXiv:2504.05169},
+  year={2025}
+}
+
+
 ```
 
 ## Contact
